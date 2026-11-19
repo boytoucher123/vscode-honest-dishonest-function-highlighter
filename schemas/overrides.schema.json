@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "12dPL honesty overrides",
+  "type": "object",
+  "properties": {
+    "$comment": { "type": "string" },
+    "functions": {
+      "type": "object",
+      "description": "Key: function name (applies to all overloads and to your own functions) or signature, e.g. \"Get_name(Element, Text &)\".",
+      "additionalProperties": { "enum": ["honest", "dishonest"] }
+    },
+    "categories": {
+      "type": "object",
+      "description": "Re-classify every built-in in a category.",
+      "propertyNames": {
+        "enum": ["console", "container", "database", "element", "file", "geometry", "math", "project", "random", "system", "text", "time", "ui", "xml", "other"]
+      },
+      "additionalProperties": { "enum": ["honest", "dishonest"] }
+    }
+  },
+  "additionalProperties": false
+}
