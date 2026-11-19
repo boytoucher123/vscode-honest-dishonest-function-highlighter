@@ -1,0 +1,303 @@
+{
+  "name": "12dpl-honesty-highlighter",
+  "displayName": "12dPL Honest/Dishonest Function Highlighter",
+  "description": "Highlights honest 12dPL functions (only touch their parameters) in green and dishonest ones in red. Toggle with Ctrl+Alt+H.",
+  "version": "0.1.0",
+  "publisher": "boytoucher123",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boytoucher123/vscode-honest-dishonest-function-highlighter"
+  },
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "12d",
+    "12dPL",
+    "4dm",
+    "pure functions",
+    "side effects"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:12dpl",
+    "workspaceContains:**/*.4dm"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "12dpl",
+        "aliases": [
+          "12dPL"
+        ],
+        "extensions": [
+          ".4dm"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "12dplHonesty.toggle",
+        "title": "Toggle Honest/Dishonest Highlighting",
+        "category": "12dPL Honesty",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "12dplHonesty.enable",
+        "title": "Enable Honest/Dishonest Highlighting",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.disable",
+        "title": "Disable Honest/Dishonest Highlighting",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.markHonest",
+        "title": "Mark Function as Honest",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.markDishonest",
+        "title": "Mark Function as Dishonest",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.clearOverride",
+        "title": "Reset Function to Default Classification",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.setCategory",
+        "title": "Re-classify a Built-in Category…",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.openOverrides",
+        "title": "Open Classification Overrides File",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.showBuiltins",
+        "title": "Show All Built-in Classifications",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.refresh",
+        "title": "Re-analyse",
+        "category": "12dPL Honesty"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "12dplHonesty.toggle",
+        "key": "ctrl+alt+h",
+        "mac": "ctrl+alt+h"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "12dplHonesty.markHonest",
+          "when": "12dplHonesty.enabled && (editorLangId == 12dpl || resourceExtname == .4dm)",
+          "group": "12dplHonesty@1"
+        },
+        {
+          "command": "12dplHonesty.markDishonest",
+          "when": "12dplHonesty.enabled && (editorLangId == 12dpl || resourceExtname == .4dm)",
+          "group": "12dplHonesty@2"
+        },
+        {
+          "command": "12dplHonesty.clearOverride",
+          "when": "12dplHonesty.enabled && (editorLangId == 12dpl || resourceExtname == .4dm)",
+          "group": "12dplHonesty@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "12dplHonesty.toggle",
+          "when": "editorLangId == 12dpl || resourceExtname == .4dm",
+          "group": "navigation@99"
+        }
+      ]
+    },
+    "taskDefinitions": [
+      {
+        "type": "12dpl-honesty",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "toggle",
+              "enable",
+              "disable"
+            ],
+            "description": "What to do with the honest/dishonest highlighting."
+          }
+        }
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "**/12dpl-honesty.json",
+        "url": "./schemas/overrides.schema.json"
+      }
+    ],
+    "configuration": {
+      "title": "12dPL Honesty",
+      "properties": {
+        "12dplHonesty.enabledByDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start with highlighting on the first time the extension runs. After that the last toggle state is remembered."
+        },
+        "12dplHonesty.colors": {
+          "type": "object",
+          "default": {
+            "honest": "#3fb950",
+            "dishonest": "#f85149",
+            "unknown": ""
+          },
+          "properties": {
+            "honest": {
+              "type": "string",
+              "format": "color-hex"
+            },
+            "dishonest": {
+              "type": "string",
+              "format": "color-hex"
+            },
+            "unknown": {
+              "type": "string",
+              "description": "Colour for calls the extension can't resolve. Empty = leave them alone."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Highlight colours (hex)."
+        },
+        "12dplHonesty.style": {
+          "type": "object",
+          "default": {
+            "background": true,
+            "bold": false,
+            "underline": false
+          },
+          "properties": {
+            "background": {
+              "type": "boolean",
+              "description": "Tint the background behind function names."
+            },
+            "bold": {
+              "type": "boolean"
+            },
+            "underline": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "description": "How highlighted function names are drawn."
+        },
+        "12dplHonesty.highlightDefinitions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight function names where they are defined."
+        },
+        "12dplHonesty.highlightCalls": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight function names where they are called (built-ins and your own functions)."
+        },
+        "12dplHonesty.unknownFunctions": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "dishonest",
+            "honest"
+          ],
+          "enumDescriptions": [
+            "Leave unresolved calls (and functions that depend on them) uncoloured.",
+            "Assume anything that can't be found is dishonest.",
+            "Assume anything that can't be found is honest."
+          ],
+          "default": "unknown",
+          "description": "How to treat calls to functions that aren't built-ins and can't be found in the file, its #includes or the workspace."
+        },
+        "12dplHonesty.includePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra folders to search for #include files. ${workspaceFolder} and ${userHome} are supported. The 12dPL Language extension's 12dpl.compiler.includePaths are used too."
+        },
+        "12dplHonesty.searchWorkspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "If a called function isn't in the file or its #includes, look for its definition anywhere in the workspace."
+        },
+        "12dplHonesty.maxWorkspaceFiles": {
+          "type": "number",
+          "default": 3000,
+          "description": "Maximum number of workspace files indexed for the fallback search."
+        },
+        "12dplHonesty.overridesFile": {
+          "type": "string",
+          "default": ".vscode/12dpl-honesty.json",
+          "description": "Where classification overrides are stored, relative to each workspace folder (or absolute). Commit it to share your classifications with the team."
+        },
+        "12dplHonesty.functionOverrides": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "honest",
+              "dishonest"
+            ]
+          },
+          "markdownDescription": "Personal overrides that win over the overrides file. Key is a function name (`Print`) or a signature (`Get_name(Element, Text &)`)."
+        },
+        "12dplHonesty.categoryOverrides": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "honest",
+              "dishonest"
+            ]
+          },
+          "markdownDescription": "Personal category overrides, e.g. `{ \"element\": \"dishonest\" }`. Categories: console, container, database, element, file, geometry, math, project, random, system, text, time, ui, xml."
+        },
+        "12dplHonesty.alwaysShowStatusBar": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the toggle in the status bar even when the active file isn't 12dPL."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "classify": "node scripts/classify-builtins.js",
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test": "tsc -p . && node --test test/*.test.js",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.82.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.4.0"
+  }
+}
