@@ -13,7 +13,7 @@
       "type": "object",
       "description": "Re-classify every built-in in a category.",
       "propertyNames": {
-        "enum": ["console", "container", "database", "element", "file", "geometry", "math", "project", "random", "system", "text", "time", "ui", "xml", "other"]
+        "enum": ["math", "text", "geometry", "container", "xml", "element", "project-handle", "ui-handle", "file-handle", "database-handle", "system-handle", "project", "screen", "prompt", "console", "file", "system", "time", "random", "other"]
       },
       "additionalProperties": { "enum": ["honest", "dishonest"] }
     }
