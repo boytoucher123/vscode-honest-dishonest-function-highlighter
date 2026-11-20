@@ -5,9 +5,14 @@ function name by whether the function is **honest** or **dishonest**:
 
 - 🟢 **Honest** — everything the function touches comes in through its parameters.
   `To_text(Integer)`, `Text_length`, `Sqrt`, and your own pure helpers.
-- 🔴 **Dishonest** — the function reaches outside its parameters: the console (`Print`), the clock
-  (`Get_time`), files, panels/widgets, the 12d project (models, tins, views, settings), random
-  numbers, global variables…
+- 🔴 **Dishonest** — the function reaches something that was *not* passed in: the console
+  (`Print`), the clock (`Get_time`), the screen or event loop (`Show_widget`, `Wait_on_events`,
+  `Model_draw`), the command line, files opened by name, project settings, a model or view looked
+  up by name (`Get_view("1")`), random numbers, global variables…
+
+**Handles count as parameters.** `View_add_model(view, model)` is honest: everything it affects
+was passed in. `Get_view("1")` is dishonest: the view it returns was neither passed in nor built
+from its parameters. `Model_draw(model)` is dishonest: it draws on views it wasn't given.
 
 Dishonesty spreads: **a function that calls a dishonest function is dishonest**, however deep the
 chain goes (recursion is handled). A function that reads or writes a **global variable** is
@@ -89,25 +94,37 @@ the default.
 | `math` | honest | `Sqrt`, `Sin`, `Absolute`, `Pi`, angle conversions, `Xeqy`… |
 | `text` | honest | `To_text`, `Text_length`, `Get_subtext`, `Find_text`, `Text_upper`… |
 | `geometry` | honest | `Point`/`Line`/`Arc`/`Segment`/`Vector`/`Matrix` maths |
-| `container` | honest | `Dynamic_*`, Maps/Sets |
+| `container` | honest | `Dynamic_*`, Maps/Sets, `Append` |
 | `xml` | honest | in-memory `XML_Document`/`XML_Node` manipulation |
-| `element` | honest | calls that only work on `Element`/`Attributes`/`Uid` handles you pass in (see below) |
+| `element` | honest | calls on `Element`/`Attributes`/`Uid` handles passed in (`Get_name`, `Set_colour`…) |
+| `project-handle` | honest | calls on `Model`/`View`/`Tin`/… handles passed in (`View_add_model`, `Set_model`, `Calc_extent`, `View_redraw`, `View_fit`, `Tin_height`…) |
+| `ui-handle` | honest | building panels/widgets and calls on widgets passed in (`Create_panel`, `Create_input_box`, `Append`, `Validate`, `Get_data`, `Set_data`…) |
+| `file-handle` | honest | reading/writing through a `File` handle passed in (`File_read_line`, `File_write_line`, `File_close`) |
+| `database-handle` | honest | calls on `Connection`/query handles passed in |
+| `system-handle` | honest | calls on a `Macro_Handle` passed in |
+| `project` | dishonest | getting or creating models/views/tins/functions by name or id (`Get_view(Text)`, `Get_model(Text)`, `Create_model`), project attributes/settings, colours, styles, drainage settings… |
+| `screen` | dishonest | the screen, cursor and event loop: `Show_widget`, `Hide_widget`, `Wait_on_events`, `Model_draw`, `Element_draw`, highlighting |
+| `prompt` | dishonest | `*_prompt` |
 | `console` | dishonest | `Print`, `Exit`, `Set_message_text`, `*_dump`, `*_debug`… |
-| `ui` | dishonest | panels, widgets, `*_prompt`, drawing, highlighting |
-| `project` | dishonest | models, tins, views, project attributes/settings, colours, styles, drainage settings… |
-| `file` | dishonest | `File_*`, `Read_*`, `Write_*`, folders |
-| `database` | dishonest | SQL connections and queries |
-| `system` | dishonest | `Getenv`, `System`, clipboard, processes, command-line arguments, licences, versions |
+| `file` | dishonest | opening, reading or writing files and folders **by name** (`File_open`, `Read_*`, `Write_*`, `Save_graph_to_png`…) |
+| `system` | dishonest | `Getenv`, `System`, clipboard, processes, command-line arguments, licences, versions, macros |
 | `time` | dishonest | `Get_time`, `Date`, `Sleep`, timers |
 | `random` | dishonest | random numbers, `GUID_Gen` |
 
-**The `element` judgement call.** In 12d an `Element` is a handle that can point into the project
-database. By default, a call that only uses the element you pass in (`Get_name(Element, Text &)`,
-`Get_points`, `Set_colour`, …) counts as honest, because it touches nothing but its parameters.
-Once the element lives in a model, though, reading it depends on project state. If you take the
-stricter view, set `"categories": { "element": "dishonest" }`. Calls that reach the project
-*through* an element (for example `Get_model(Element, Model &)`) are always dishonest, because they
-involve a `Model`.
+**Judgement calls you might want to flip.** Applying "handles are parameters" consistently makes
+a few things honest that you could argue either way:
+
+- `file-handle`: `File_read_line(file, line)` only touches the `File` it is given. But a second
+  call returns the next line, and the file's contents live on disk. Opening the file
+  (`File_open("name", …)`) is always dishonest.
+- `database-handle`: the same reasoning applies to an open database connection.
+- `element`, `project-handle`: a handle points at live project data that other code can change
+  between calls.
+- `Validate(Model_Box, …, Model &)`: honest because you pass the widget in, even though it hands
+  back a model looked up from the name typed into the box.
+
+To flip any of these, set `"categories": { "file-handle": "dishonest" }` (or the signature, for one
+overload).
 
 ## How it finds your functions
 

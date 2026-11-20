@@ -118,3 +118,47 @@ test('user overloads are resolved by argument types', () => {
   const v = Object.fromEntries(res.functions.filter((f) => f.def.name.length === 1).map((f) => [f.def.name, f.verdict]));
   assert.deepStrictEqual(v, { a: 'honest', b: 'dishonest' });
 });
+
+test('handles passed in are parameters: model/view/widget calls are honest, lookups are not', () => {
+  const builtins = new Builtins(data);
+  const types = new Set([...builtins.typeNames(), ...CORE_TYPES]);
+  const src = `
+void add_to_view(View view, Model new_model, Element new_string)
+{
+  View_add_model(view, new_model);
+  Set_model(new_string, new_model);
+  Calc_extent(new_model);
+  View_redraw(view);
+  View_fit(view);
+}
+
+Panel build_panel(Text title)
+{
+  Panel panel = Create_panel(title);
+  Input_Box box = Create_input_box("Name", panel);
+  Append(box, panel);
+  return panel;
+}
+
+Integer read_box(Input_Box box, Text &value) { return Validate(box, value); }
+
+View lookup_view() { return Get_view("1"); }
+void draw(Model m) { Model_draw(m); }
+void show(Panel panel) { Show_widget(panel); }
+Integer events() { Integer64 id; Text cmd, msg; return Wait_on_events(id, cmd, msg); }
+Integer arg() { Text a; return Get_command_argument(1, a); }
+`;
+  const parsed = parse12dpl(src, (n) => types.has(n));
+  const res = analyze([{ path: 'x.4dm', parsed, priority: 0 }], 'x.4dm', builtins, { unknownFunctions: 'dishonest' });
+  const v = Object.fromEntries(res.functions.map((f) => [f.def.name, f.verdict]));
+  assert.deepStrictEqual(v, {
+    add_to_view: 'honest',
+    build_panel: 'honest',
+    read_box: 'honest',
+    lookup_view: 'dishonest',
+    draw: 'dishonest',
+    show: 'dishonest',
+    events: 'dishonest',
+    arg: 'dishonest',
+  });
+});
