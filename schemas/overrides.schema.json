@@ -16,6 +16,12 @@
         "enum": ["math", "text", "geometry", "container", "xml", "element", "project-handle", "ui-handle", "file-handle", "database-handle", "system-handle", "project", "screen", "prompt", "console", "file", "system", "time", "random", "other"]
       },
       "additionalProperties": { "enum": ["honest", "dishonest"] }
+    },
+    "ignoredGlobals": {
+      "type": "array",
+      "description": "Global variables that don't make a function dishonest when it reads or writes them.",
+      "items": { "type": "string" },
+      "uniqueItems": true
     }
   },
   "additionalProperties": false

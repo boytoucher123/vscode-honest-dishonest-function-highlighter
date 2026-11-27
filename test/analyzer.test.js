@@ -162,3 +162,43 @@ Integer arg() { Text a; return Get_command_argument(1, a); }
     arg: 'dishonest',
   });
 });
+
+test('ignored globals do not make a function dishonest', () => {
+  const { verdicts } = run({ ignoredGlobals: ['g_counter'] });
+  assert.strictEqual(verdicts.bump, 'honest');
+  // main still writes g_name (not ignored) and calls Print.
+  assert.strictEqual(verdicts.main, 'dishonest');
+});
+
+test('ignored globals: chains carry the global name and stop when it is ignored', () => {
+  const src = `
+{
+  Integer DEBUG = 0;
+  Integer COUNT = 0;
+}
+Integer debug_on() { return DEBUG; }
+Integer both() { return DEBUG + COUNT; }
+Integer uses_debug() { return debug_on(); }
+void main() { uses_debug(); }
+`;
+  const analyzeWith = (ignoredGlobals) => {
+    const builtins = new Builtins(data, mergeOverrides({ ignoredGlobals }));
+    const types = new Set([...builtins.typeNames(), ...CORE_TYPES]);
+    const parsed = parse12dpl(src, (n) => types.has(n));
+    return analyze([{ path: 'x.4dm', parsed, priority: 0 }], 'x.4dm', builtins, { unknownFunctions: 'unknown' });
+  };
+  const before = analyzeWith([]);
+  const v = (res, n) => res.functions.find((f) => f.def.name === n);
+  assert.strictEqual(v(before, 'uses_debug').verdict, 'dishonest');
+  assert.strictEqual(v(before, 'uses_debug').global, 'DEBUG');
+  const callHl = before.highlights.find((h) => h.name === 'uses_debug' && h.kind === 'call');
+  assert.strictEqual(callHl.global, 'DEBUG');
+
+  const after = analyzeWith(['DEBUG']);
+  assert.strictEqual(v(after, 'debug_on').verdict, 'honest');
+  assert.strictEqual(v(after, 'uses_debug').verdict, 'honest');
+  assert.strictEqual(v(after, 'main').verdict, 'honest');
+  // Another, non-ignored global still counts.
+  assert.strictEqual(v(after, 'both').verdict, 'dishonest');
+  assert.strictEqual(v(after, 'both').global, 'COUNT');
+});

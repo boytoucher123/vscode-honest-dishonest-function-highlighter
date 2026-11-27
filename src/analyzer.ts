@@ -32,6 +32,8 @@ export interface FunctionResult {
   verdict: Verdict;
   /** Human-readable explanation; for propagated dishonesty this is the whole chain. */
   reason: string;
+  /** When the dishonesty comes (directly or through calls) from a global variable, its name. */
+  global?: string;
 }
 
 export interface Highlight {
@@ -42,6 +44,8 @@ export interface Highlight {
   name: string;
   /** Markdown explanation for hovers. */
   reason: string;
+  /** Global variable at the root of the dishonesty, if any (so the hover can offer to ignore it). */
+  global?: string;
 }
 
 export interface AnalysisResult {
@@ -167,10 +171,11 @@ export function analyze(
     resolvedCalls.set(r, r.def.calls.map((call) => ({ call, target: resolve(call) })));
     if (overridden.has(r)) continue;
 
-    const g = r.def.freeRefs.find((ref) => globals.has(ref.name) && !macros.has(ref.name));
+    const g = r.def.freeRefs.find((ref) => globals.has(ref.name) && !macros.has(ref.name) && !builtins.isIgnoredGlobal(ref.name));
     if (g) {
       r.verdict = 'dishonest';
       r.reason = `uses global variable \`${g.name}\`.`;
+      r.global = g.name;
       continue;
     }
     for (const { call, target } of resolvedCalls.get(r)!) {
@@ -204,6 +209,7 @@ export function analyze(
           if (v.verdict === to && from.includes(r.verdict)) {
             r.verdict = to;
             r.reason = `calls ${v.reason}`;
+            r.global = t.kind === 'user' ? t.fns.find((f) => f.verdict === to)?.global : undefined;
             changed = true;
             break;
           }
@@ -232,15 +238,18 @@ export function analyze(
           kind: 'definition',
           name: def.name,
           reason: explain(def.name, r.verdict, r.reason),
+          global: r.verdict === 'dishonest' ? r.global : undefined,
         });
       }
       for (const call of def.calls) {
         const t = resolve(call);
         const v = targetVerdict(t, call.name);
         let reason: string;
+        let global: string | undefined;
         if (t.kind === 'user') {
           const f = t.fns.find((x) => x.verdict === v.verdict) ?? t.fns[0];
           reason = explain(call.name, v.verdict, f.reason);
+          if (v.verdict === 'dishonest') global = f.global;
         } else if (t.kind === 'builtin') {
           reason = explain(t.signature ?? call.name, v.verdict, t.reason) + '\n\n_Built-in 12dPL call._';
         } else if (t.kind === 'unknown') {
@@ -248,7 +257,7 @@ export function analyze(
         } else {
           reason = explain(call.name, v.verdict, v.reason);
         }
-        highlights.push({ offset: call.offset, length: call.name.length, verdict: v.verdict, kind: 'call', name: call.name, reason });
+        highlights.push({ offset: call.offset, length: call.name.length, verdict: v.verdict, kind: 'call', name: call.name, reason, global });
       }
     }
   }
