@@ -77,9 +77,24 @@ your classifications with your team:
   },
   "categories": {
     "element": "dishonest"                  // treat every Element-handle call as dishonest
-  }
+  },
+  "ignoredGlobals": ["DEBUG_MODE"]          // using this global doesn't make a function dishonest
 }
 ```
+
+### Ignoring a global variable
+
+Some globals don't really count, such as a debug flag or a constant that is set once and never
+changed. To stop one of them making functions dishonest:
+
+- hover a function that's dishonest because of the global and click **Ignore global `NAME`**. This
+  works through call chains too, so you can click it on any caller;
+- or right-click the global (or a function that uses it) and choose **Ignore Global Variable in
+  Honesty Checks**.
+
+**12dPL Honesty: Stop Ignoring Global Variable** puts one back. Ignored globals are saved under
+`ignoredGlobals` in the overrides file. For a personal list, use the `12dplHonesty.ignoredGlobals`
+setting, which is added to the file's list.
 
 For personal tweaks that aren't shared, use the `12dplHonesty.functionOverrides` and
 `12dplHonesty.categoryOverrides` settings. These take precedence over the file.
@@ -158,6 +173,7 @@ function that depends on it but is otherwise honest. Set `12dplHonesty.unknownFu
 | `12dplHonesty.searchWorkspace` | `true` | Workspace fallback for unresolved calls |
 | `12dplHonesty.overridesFile` | `.vscode/12dpl-honesty.json` | Shared overrides file |
 | `12dplHonesty.functionOverrides` / `categoryOverrides` | `{}` | Personal overrides |
+| `12dplHonesty.ignoredGlobals` | `[]` | Personal list of globals to ignore |
 | `12dplHonesty.enabledByDefault` | `false` | Initial state on first run |
 
 ## Install

@@ -2,7 +2,7 @@
   "name": "12dpl-honesty-highlighter",
   "displayName": "12dPL Honest/Dishonest Function Highlighter",
   "description": "Highlights honest 12dPL functions (only touch their parameters) in green and dishonest ones in red. Toggle with Ctrl+Alt+H.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "boytoucher123",
   "license": "MIT",
   "repository": {
@@ -74,8 +74,18 @@
         "category": "12dPL Honesty"
       },
       {
+        "command": "12dplHonesty.ignoreGlobal",
+        "title": "Ignore Global Variable in Honesty Checks",
+        "category": "12dPL Honesty"
+      },
+      {
+        "command": "12dplHonesty.unignoreGlobal",
+        "title": "Stop Ignoring Global Variable",
+        "category": "12dPL Honesty"
+      },
+      {
         "command": "12dplHonesty.setCategory",
-        "title": "Re-classify a Built-in Category…",
+        "title": "Re-classify a Built-in Category\u2026",
         "category": "12dPL Honesty"
       },
       {
@@ -117,6 +127,11 @@
           "command": "12dplHonesty.clearOverride",
           "when": "12dplHonesty.enabled && (editorLangId == 12dpl || resourceExtname == .4dm)",
           "group": "12dplHonesty@3"
+        },
+        {
+          "command": "12dplHonesty.ignoreGlobal",
+          "when": "12dplHonesty.enabled && (editorLangId == 12dpl || resourceExtname == .4dm)",
+          "group": "12dplHonesty@4"
         }
       ],
       "editor/title": [
@@ -277,6 +292,14 @@
             ]
           },
           "markdownDescription": "Personal category overrides, e.g. `{ \"element\": \"dishonest\" }`. Categories: math, text, geometry, container, xml, element, project-handle, ui-handle, file-handle, database-handle, system-handle (honest by default); project, screen, prompt, console, file, system, time, random (dishonest by default)."
+        },
+        "12dplHonesty.ignoredGlobals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Personal list of global variable names that don't make a function dishonest (added to the overrides file's `ignoredGlobals`)."
         },
         "12dplHonesty.alwaysShowStatusBar": {
           "type": "boolean",

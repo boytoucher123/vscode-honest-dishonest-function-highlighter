@@ -61,6 +61,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(`${CFG}.markDishonest`, (name?: unknown) => markFunction('dishonest', name)),
     vscode.commands.registerCommand(`${CFG}.clearOverride`, (name?: unknown) => markFunction(undefined, name)),
     vscode.commands.registerCommand(`${CFG}.setCategory`, setCategory),
+    vscode.commands.registerCommand(`${CFG}.ignoreGlobal`, (name?: unknown) => setGlobalIgnored(true, name)),
+    vscode.commands.registerCommand(`${CFG}.unignoreGlobal`, (name?: unknown) => setGlobalIgnored(false, name)),
     vscode.commands.registerCommand(`${CFG}.openOverrides`, openOverridesFile),
     vscode.commands.registerCommand(`${CFG}.showBuiltins`, showBuiltins),
 
@@ -144,7 +146,7 @@ function loadOverrides() {
   for (const p of overridesFilePaths()) {
     try {
       const raw = JSON.parse(stripJsonComments(fs.readFileSync(p, 'utf8')));
-      parts.push({ functions: raw.functions ?? {}, categories: raw.categories ?? {} });
+      parts.push({ functions: raw.functions ?? {}, categories: raw.categories ?? {}, ignoredGlobals: raw.ignoredGlobals ?? [] });
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
         void vscode.window.showWarningMessage(`12dPL honesty: could not read ${p}: ${(e as Error).message}`);
@@ -158,6 +160,7 @@ function loadOverrides() {
     mergeOverrides(fileOverrides, {
       functions: cfg.get<Record<string, Honesty>>('functionOverrides', {}),
       categories: cfg.get<Record<string, Honesty>>('categoryOverrides', {}),
+      ignoredGlobals: cfg.get<string[]>('ignoredGlobals', []),
     }),
   );
 }
@@ -341,7 +344,11 @@ function provideHover(doc: vscode.TextDocument, pos: vscode.Position): vscode.Ho
   md.appendMarkdown(
     `\n\n[Mark honest](command:${CFG}.markHonest?${arg}) · [Mark dishonest](command:${CFG}.markDishonest?${arg}) · [Reset](command:${CFG}.clearOverride?${arg})`,
   );
-  md.isTrusted = { enabledCommands: [`${CFG}.markHonest`, `${CFG}.markDishonest`, `${CFG}.clearOverride`] };
+  if (h.global) {
+    const g = encodeURIComponent(JSON.stringify([h.global]));
+    md.appendMarkdown(` · [Ignore global \`${h.global}\`](command:${CFG}.ignoreGlobal?${g})`);
+  }
+  md.isTrusted = { enabledCommands: [`${CFG}.markHonest`, `${CFG}.markDishonest`, `${CFG}.clearOverride`, `${CFG}.ignoreGlobal`] };
   return new vscode.Hover(md, new vscode.Range(doc.positionAt(h.offset), doc.positionAt(h.offset + h.length)));
 }
 
@@ -353,16 +360,22 @@ interface OverridesFileShape {
   $comment?: string;
   functions: Record<string, Honesty>;
   categories: Record<string, Honesty>;
+  ignoredGlobals?: string[];
 }
 
 function readOverridesFile(p: string): OverridesFileShape {
   try {
     const raw = JSON.parse(stripJsonComments(fs.readFileSync(p, 'utf8')));
-    return { ...raw, functions: raw.functions ?? {}, categories: raw.categories ?? {} };
+    return {
+      ...raw,
+      functions: raw.functions ?? {},
+      categories: raw.categories ?? {},
+      ignoredGlobals: Array.isArray(raw.ignoredGlobals) ? raw.ignoredGlobals : undefined,
+    };
   } catch {
     return {
       $comment:
-        'Overrides for the 12dPL honest/dishonest highlighter. "functions" keys are a name (all overloads, and user functions) or a signature like "Get_name(Element, Text &)". "categories" re-classifies every builtin in a category. Values: "honest" or "dishonest".',
+        'Overrides for the 12dPL honest/dishonest highlighter. "functions" keys are a name (all overloads, and user functions) or a signature like "Get_name(Element, Text &)". "categories" re-classifies every builtin in a category. Values: "honest" or "dishonest". "ignoredGlobals" lists global variables that don\'t make a function dishonest.',
       functions: {},
       categories: {},
     };
@@ -372,7 +385,10 @@ function readOverridesFile(p: string): OverridesFileShape {
 async function writeOverridesFile(p: string, data: OverridesFileShape) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
   const sortObj = (o: Record<string, Honesty>) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
-  fs.writeFileSync(p, JSON.stringify({ ...data, functions: sortObj(data.functions), categories: sortObj(data.categories) }, null, 2) + '\n');
+  const out: OverridesFileShape = { ...data, functions: sortObj(data.functions), categories: sortObj(data.categories) };
+  if (out.ignoredGlobals?.length) out.ignoredGlobals = [...new Set(out.ignoredGlobals)].sort();
+  else delete out.ignoredGlobals;
+  fs.writeFileSync(p, JSON.stringify(out, null, 2) + '\n');
   loadOverrides();
   refreshAll();
 }
@@ -433,6 +449,48 @@ async function markFunction(value: Honesty | undefined, nameArg?: unknown) {
     void vscode.window.showInformationMessage(`Note: "${name}" also has an override in your settings (12dplHonesty.functionOverrides), which takes precedence.`);
   }
   vscode.window.setStatusBarMessage(value ? `${key} marked ${value}` : `Overrides for ${name} cleared`, 3000);
+}
+
+/**
+ * Adds/removes a global variable from the ignore list. The name comes from a hover link, else the
+ * word under the cursor: on a function made dishonest by a global, that global is used.
+ */
+async function setGlobalIgnored(ignore: boolean, nameArg?: unknown) {
+  let name: string | undefined = typeof nameArg === 'string' ? nameArg : undefined;
+  const editor = vscode.window.activeTextEditor;
+  if (!name && editor) {
+    const h = highlightAt(editor.document, editor.selection.active);
+    if (h?.global) name = h.global;
+    else {
+      const range = editor.document.getWordRangeAtPosition(editor.selection.active, /[A-Za-z_][A-Za-z0-9_]*/);
+      name = range ? editor.document.getText(range) : undefined;
+      if (!ignore && name && !builtins.isIgnoredGlobal(name)) name = undefined;
+    }
+  }
+  if (!name && !ignore) {
+    const list = builtins.getOverrides().ignoredGlobals;
+    if (!list.length) {
+      void vscode.window.showInformationMessage('No global variables are being ignored.');
+      return;
+    }
+    name = await vscode.window.showQuickPick([...list].sort(), { placeHolder: 'Stop ignoring which global variable?' });
+  }
+  if (!name) {
+    name = (await vscode.window.showInputBox({ prompt: 'Global variable to ignore in honesty checks' }))?.trim();
+  }
+  if (!name) return;
+  const file = await targetOverridesFile();
+  if (!file) return;
+  const data = readOverridesFile(file);
+  const list = new Set(data.ignoredGlobals ?? []);
+  if (ignore) list.add(name);
+  else list.delete(name);
+  data.ignoredGlobals = [...list];
+  await writeOverridesFile(file, data);
+  if (!ignore && config().get<string[]>('ignoredGlobals', []).includes(name)) {
+    void vscode.window.showInformationMessage(`Note: "${name}" is also ignored in your settings (12dplHonesty.ignoredGlobals).`);
+  }
+  vscode.window.setStatusBarMessage(ignore ? `Global ${name} ignored for honesty` : `Global ${name} counts again`, 3000);
 }
 
 async function setCategory() {

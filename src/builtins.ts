@@ -23,13 +23,15 @@ export interface BuiltinData {
  * User overrides. Keys in `functions` are either a bare name (`Print`, `My_function`) which
  * applies to every overload, or a signature (`Get_name(Element, Text &)`) for one overload.
  * `categories` re-classifies every builtin of a category (e.g. `"element": "dishonest"`).
+ * `ignoredGlobals` lists global variables that don't make a function dishonest when it uses them.
  */
 export interface Overrides {
   functions: Record<string, Honesty>;
   categories: Record<string, Honesty>;
+  ignoredGlobals: string[];
 }
 
-export const emptyOverrides = (): Overrides => ({ functions: {}, categories: {} });
+export const emptyOverrides = (): Overrides => ({ functions: {}, categories: {}, ignoredGlobals: [] });
 
 export function mergeOverrides(...list: (Partial<Overrides> | undefined)[]): Overrides {
   const out = emptyOverrides();
@@ -37,6 +39,9 @@ export function mergeOverrides(...list: (Partial<Overrides> | undefined)[]): Ove
     if (!o) continue;
     for (const [k, v] of Object.entries(o.functions ?? {})) if (isHonesty(v)) out.functions[normalizeKey(k)] = v;
     for (const [k, v] of Object.entries(o.categories ?? {})) if (isHonesty(v)) out.categories[k] = v;
+    for (const g of Array.isArray(o.ignoredGlobals) ? o.ignoredGlobals : []) {
+      if (typeof g === 'string' && g.trim() && !out.ignoredGlobals.includes(g.trim())) out.ignoredGlobals.push(g.trim());
+    }
   }
   return out;
 }
@@ -118,6 +123,11 @@ export class Builtins {
     const cat = this.overrides.categories[o.category];
     if (cat) return { honesty: cat, reason: `Category "${o.category}" overridden to ${cat}.` };
     return { honesty: o.honesty, reason: o.reason };
+  }
+
+  /** True if the user has said this global variable doesn't count against honesty. */
+  isIgnoredGlobal(name: string): boolean {
+    return this.overrides.ignoredGlobals.includes(name);
   }
 
   /** Name-level override (applies to user-defined functions too). */
